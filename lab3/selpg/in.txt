@@ -1,2 +1,21 @@
-selpg2 fileName -1 -1 -1 false printDst
-selpg2  0 0 72 false 
+line1: cbb
+line2: cf
+line3: jmf
+line4: ppy
+line5: ppc
+line6: ok
+line7: cbb
+line8: cf
+line9: jmf
+line10: ppy
+line11: ppc
+line12: ok
+line13: cbb
+line14: cf
+line15: jmf
+line16: ppy
+line17: ppc
+line18: ok
+line19: cbb
+line20: cf
+line21: jmf

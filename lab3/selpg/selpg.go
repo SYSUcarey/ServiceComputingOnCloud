@@ -2,19 +2,21 @@ package main
 
 import(
 	"bufio"
-	"bytes"
+//	"bytes"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
-	"strings"
+//	"strings"
 	flag "github.com/spf13/pflag"
 )
 
 /*
  * Global Var and flag Args 
  */
-var fileName string = "fileName"
+var err error
+var progname string
+var fileName string = "default"
 var startPage int = -1
 var endPage int = -1
 var pageLines int = -1
@@ -58,102 +60,127 @@ func args_Handler() {
 	}
 	if startPage < 1 || startPage > (int(^uint(0) >> 1)-1) {
 		fmt.Println("Error: Start Page Invalid!\n-h for help!")
-		os.Exit(1)
+		os.Exit(2)
 	}
 	if endPage < 1 || endPage > (int(^uint(0) >> 1)-1) {
 		fmt.Println("Error: End Page Invalid!\n-h for help!")
-		os.Exit(1)
+		os.Exit(3)
 	}
 	if endPage < startPage {
 		fmt.Println("It must obey that End Page >= Start Page!\n-h for help!")
-		os.Exit(1)
+		os.Exit(4)
 	}
 	if pageLines != 72 {
 		if pageLines < 1 {
-			fmt.Println("pageLines Invalid\n-h for help!")
-			os.Exit(1)
+			fmt.Println("Page's Lines Invalid\n-h for help!")
+			os.Exit(5)
 		}
+	}
+
+	/* there is one more arg */
+	if flag.NArg() > 0 {
+		fileName = flag.Arg(0)
+		/* check if file exists */
+		file, err := os.Open(fileName)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "input file \"%s\" does not exist\n-h for help!", fileName)
+			os.Exit(6)
+		}
+		/* check if file is readable */
+		file, err = os.OpenFile(fileName, os.O_RDONLY, 0666)
+		if err != nil {
+			if os.IsPermission(err) {
+				fmt.Fprintf(os.Stderr, "input file \"%s\" exists but cannot be read\n", fileName)
+				os.Exit(7)
+			}
+		}
+		file.Close()
 	}
 }
 
-func readAndWrite() (string) {
-	result := ""
-	pageCount := 1
-	lineCount := 0
-	reader := bufio.NewReader(os.Stdin)
-
-	// set the input source
-	if flag.NArg() > 0 {
-		// accept one file each time
-		fileName = flag.Arg(0)
-		file, err := os.Open(fileName)
-		if err != nil {
-			return "ERROR1"
+func readAndWrite() {
+	fin := os.Stdin
+	fout := os.Stdout
+	var (
+		 page_ctr int
+		 line_ctr int
+		 err error
+		 err1 error
+		 err2 error
+		 line string
+		 cmd *exec.Cmd
+		 stdin io.WriteCloser
+	)
+	/* set the input source */
+	if fileName != "" {
+		fin, err1 = os.Open(fileName)
+		if err1 != nil {
+			fmt.Fprintf(os.Stderr, "%s: could not open input file \"%s\"\n", progname, fileName)
+			os.Exit(11)
 		}
-		defer file.Close()
-		reader = bufio.NewReader(file)
 	}
 
-	// process the input
-	if flagPage {
-		pageCount = 1
-		for {
-			str, err := reader.ReadString('\f')
-			pageCount++
-			if err == io.EOF {
-				return "ERROR2"
-			}		
-			if pageCount >= startPage && pageCount <= endPage {
-				result = strings.Join([]string{result, str}, "")
+	if printDst != "" {
+		cmd = exec.Command("cat", "-n")
+		stdin, err = cmd.StdinPipe()
+		if err != nil {
+			fmt.Println(err)
+		}
+	} else {
+		stdin = nil
+	}
+
+/* begin one of two main loops based on page type */
+	rd := bufio.NewReader(fin)
+	if flagPage == false {
+		line_ctr = 0
+		page_ctr = 1
+		for true {
+			line, err2 = rd.ReadString('\n')
+			if err2 != nil { /* error or EOF */
+				break
+			}
+			line_ctr++
+			if line_ctr > pageLines {
+				page_ctr++
+				line_ctr = 1
+			}
+			if page_ctr >= startPage && page_ctr <= endPage {
+				fmt.Fprintf(fout, "%s", line)
 			}
 		}
 	} else {
-		pageCount = 1
-		lineCount = 0
-
-		for {
-			str, err := reader.ReadString('\n')
-			lineCount++
-			if err == io.EOF {
-				return "ERROR3"
-			}		
-			if lineCount > pageLines {
-				pageCount++
-				lineCount = 1
+		page_ctr = 1
+		for true {
+			c, err3 := rd.ReadByte()
+			if err3 != nil { /* error or EOF */
+				break
 			}
-			if pageCount >= startPage && pageCount <= endPage {
-				result = strings.Join([]string{result, str}, "")
+			if c == '\f' {
+				page_ctr++
+			}
+			if page_ctr >= startPage && page_ctr <= endPage {
+				fmt.Fprintf(fout, "%c", c)
 			}
 		}
+		fmt.Print("\n")
 	}
 
-	// handle invalid input option
-	/*
-	if pageCount < startPage {
-		msg := fmt.Sprintf("start page: (%d) greater than total pages: (%d)",
-			*startPage, pageCount)
-		return "", errors.New(msg)
-	} else if pageCount < *endPage {
-		msg := fmt.Sprintf("end page: (%d) greater than total pages: (%d)",
-			*endPage, pageCount)
-		return "", errors.New(msg)
+	/* end main loop */
+	if page_ctr < startPage {
+		fmt.Fprintf(os.Stderr, "%s: start_page (%d) greater than total pages (%d), no output written\n", progname, startPage, page_ctr)
+	} else if page_ctr < endPage {
+			fmt.Fprintf(os.Stderr, "%s: end_page (%d) greater than total pages (%d), less output than expected\n", progname, endPage, page_ctr)
 	}
-	*/
-	// set the output source
-	if printDst != "default" {
-		cmd := exec.Command("lp", "-d"+printDst)
-		cmd.Stdin = strings.NewReader(result)
-		var stderr bytes.Buffer
-		cmd.Stderr = &stderr
-		//err = cmd.Run()
-		//if err != nil {
-		//	return "", errors.New(fmt.Sprint(err) + " : " + stderr.String())
-		//}
+	
+	if printDst != "" {
+		stdin.Close()
+		cmd.Stdout = fout
+		cmd.Run()
 	}
-
-
-	//return result, nil
-	return result
+	fmt.Fprintf(os.Stderr,"\n---------------\nProcess end\n")
+	fin.Close()
+	fout.Close()
 }
 
 
@@ -164,20 +191,15 @@ func readAndWrite() (string) {
 
 func main() {
 	flag.Usage = my_usage
+	progname = os.Args[0]
 	if len(os.Args) == 2 && os.Args[1] == "-h" {
 		flag.Usage()
 		os.Exit(1)
 	}
-	fmt.Println(fileName, startPage, endPage, pageLines, flagPage, printDst)
 	pflag_Parse()
 	fileName = flag.Arg(0)
-	fmt.Println(fileName, startPage, endPage, pageLines, flagPage, printDst)
 	args_Handler()
-	message := readAndWrite()
-	fmt.Println(message)
-
+	readAndWrite()
 	fmt.Println("Print Completed!")
-
-	
 }
 
