@@ -1,0 +1,2 @@
+selpg2 fileName -1 -1 -1 false printDst
+selpg2  0 0 72 false 
