@@ -2,12 +2,10 @@ package main
 
 import(
 	"bufio"
-//	"bytes"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
-//	"strings"
 	flag "github.com/spf13/pflag"
 )
 
@@ -19,7 +17,7 @@ var progname string
 var fileName string = "default"
 var startPage int = -1
 var endPage int = -1
-var pageLines int = -1
+var pageLines int = 72
 var flagPage bool = false
 var printDst string = "default"
 
@@ -83,14 +81,14 @@ func args_Handler() {
 		/* check if file exists */
 		file, err := os.Open(fileName)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "input file \"%s\" does not exist\n-h for help!", fileName)
+			fmt.Println("input file \"", fileName, "\" does not exist\n-h for help!")
 			os.Exit(6)
 		}
 		/* check if file is readable */
 		file, err = os.OpenFile(fileName, os.O_RDONLY, 0666)
 		if err != nil {
 			if os.IsPermission(err) {
-				fmt.Fprintf(os.Stderr, "input file \"%s\" exists but cannot be read\n", fileName)
+				fmt.Println("input file \"", fileName,"\" exist but cannot be read\n-h for help!")
 				os.Exit(7)
 			}
 		}
@@ -115,7 +113,7 @@ func readAndWrite() {
 	if fileName != "" {
 		fin, err1 = os.Open(fileName)
 		if err1 != nil {
-			fmt.Fprintf(os.Stderr, "%s: could not open input file \"%s\"\n", progname, fileName)
+			fmt.Println("could not open file" , fileName, " \n-h for help!")
 			os.Exit(11)
 		}
 	}
@@ -168,9 +166,9 @@ func readAndWrite() {
 
 	/* end main loop */
 	if page_ctr < startPage {
-		fmt.Fprintf(os.Stderr, "%s: start_page (%d) greater than total pages (%d), no output written\n", progname, startPage, page_ctr)
+		fmt.Println(progname, ": start_page (", startPage, ") greater than total pages (", page_ctr, "), no output written\n-h for help")
 	} else if page_ctr < endPage {
-			fmt.Fprintf(os.Stderr, "%s: end_page (%d) greater than total pages (%d), less output than expected\n", progname, endPage, page_ctr)
+		fmt.Println(progname, ": end_page (", endPage, ") greater than total pages (", page_ctr, "), less output than expected\n-h for help")
 	}
 	
 	if printDst != "" {
@@ -178,7 +176,7 @@ func readAndWrite() {
 		cmd.Stdout = fout
 		cmd.Run()
 	}
-	fmt.Fprintf(os.Stderr,"\n---------------\nProcess end\n")
+	fmt.Println("\n---------------\nProcess end\n")
 	fin.Close()
 	fout.Close()
 }
